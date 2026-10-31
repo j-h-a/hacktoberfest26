@@ -1,0 +1,252 @@
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  background: #020309;
+}
+
+canvas {
+  position: fixed;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* A small blurred copy of the frame screened over it: the neon glow. */
+#bloom {
+  /* Contrast first, so only the bright things glow and the dark arena stays dark. */
+  filter: contrast(1.8) brightness(1.3) blur(6px) saturate(1.3);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+/* Title, countdown and results */
+#overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  pointer-events: none;
+}
+
+.panel {
+  max-width: min(800px, 100%);
+  padding: 26px 36px 28px;
+  border: 2px solid var(--line);
+  border-radius: 24px;
+  background: rgb(4 5 14 / 0.88);
+  box-shadow: 0 0 80px rgb(0 0 0 / 0.7);
+  text-align: center;
+}
+
+.logo {
+  margin: 0 0 6px;
+  font-size: clamp(2.6rem, 7vw, 5rem);
+  font-weight: 900;
+  line-height: 1;
+  background: linear-gradient(90deg, var(--p1), var(--accent) 50%, var(--p2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 16px rgb(255 216 74 / 0.45));
+}
+
+.stance {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: clamp(1rem, 1.6vw, 1.25rem);
+  font-weight: 700;
+}
+
+.controls {
+  margin: 0 auto 18px;
+  border-collapse: collapse;
+  font-size: clamp(1rem, 1.6vw, 1.25rem);
+}
+
+.controls th {
+  padding: 5px 22px 5px 0;
+  color: var(--text);
+  font-weight: 700;
+  text-align: left;
+}
+
+.controls th small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.75em;
+  font-weight: 600;
+}
+
+.controls td {
+  min-width: 110px;
+  padding: 5px 10px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.controls kbd {
+  font-size: 1.05em;
+}
+
+.controls .p1,
+.stats .p1 {
+  color: var(--p1);
+}
+
+.controls .p2,
+.stats .p2 {
+  color: var(--p2);
+}
+
+.how {
+  display: grid;
+  gap: 8px;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: clamp(0.95rem, 1.5vw, 1.15rem);
+  line-height: 1.4;
+}
+
+.how b {
+  color: var(--text);
+}
+
+.how .gold {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+/* The power-up capsules, as they look in the arena */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 16px;
+  max-width: 700px;
+  margin: 16px auto 0;
+  color: var(--muted);
+  font-size: clamp(0.85rem, 1.3vw, 1rem);
+  font-weight: 700;
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.legend i {
+  display: inline-grid;
+  place-items: center;
+  min-width: 40px;
+  height: 26px;
+  padding: 0 8px;
+  border: 2px solid #fff;
+  border-radius: 13px;
+  background: hsl(var(--hue) 100% 48%);
+  color: #fff;
+  font-style: normal;
+  font-weight: 900;
+  text-shadow: 0 0 3px rgb(0 0 0 / 0.5);
+}
+
+.legend i b {
+  position: relative;
+  line-height: 1;
+}
+
+.legend .bad {
+  color: hsl(0 100% 70%);
+}
+
+.legend .bad i {
+  border-color: hsl(0 100% 58%);
+  background: hsl(0 55% 10%);
+  color: hsl(0 100% 62%);
+  text-shadow: none;
+}
+
+.start {
+  margin: 22px 0 0;
+  color: var(--accent);
+  font-size: clamp(1.1rem, 2vw, 1.5rem);
+  font-weight: 800;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+#overlay:not(.ready) .start.later {
+  visibility: hidden;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.count {
+  color: #fff;
+  font-size: clamp(7rem, 22vw, 16rem);
+  font-weight: 900;
+  line-height: 1;
+  text-shadow:
+    0 0 24px var(--accent),
+    0 0 70px var(--accent);
+  animation: pop 0.5s ease-out;
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    scale: 1.6;
+  }
+}
+
+.winner {
+  margin: 0 0 18px;
+  font-size: clamp(2.4rem, 6vw, 4.4rem);
+  font-weight: 900;
+  line-height: 1.05;
+}
+
+.winner.p1 {
+  color: var(--p1);
+  text-shadow: 0 0 24px var(--p1);
+}
+
+.winner.p2 {
+  color: var(--p2);
+  text-shadow: 0 0 24px var(--p2);
+}
+
+.stats {
+  margin: 0 auto;
+  border-collapse: collapse;
+  font-size: clamp(1rem, 1.6vw, 1.25rem);
+  font-variant-numeric: tabular-nums;
+}
+
+.stats th {
+  padding: 6px 18px 6px 0;
+  color: var(--muted);
+  font-weight: 600;
+  text-align: left;
+}
+
+.stats td {
+  min-width: 70px;
+  padding: 6px 10px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.lasted {
+  margin: 16px 0 0;
+  color: var(--muted);
+}

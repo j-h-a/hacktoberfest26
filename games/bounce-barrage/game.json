@@ -1,0 +1,6 @@
+{
+  "title": "Bounce Barrage",
+  "description": "Paddle battle, standing side-on. Tap forward to fire bouncing balls (hold it to load up to three), block your rival's with your paddle, and smash gold crates for power-ups you catch by stepping back.",
+  "players": "2",
+  "tech": "Canvas 2D"
+}
