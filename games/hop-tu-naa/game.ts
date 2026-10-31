@@ -17,11 +17,15 @@ export const MAX_SPEED = 15;
 const ACCEL = 0.06;
 const TITLE_SPEED = 6.5;
 
-/** Seconds an outer arrow has to be held before the fairy goes to the edge lane. */
-export const HOLD_TIME = 0.25;
 /** Sideways speed in lanes per second: LAT_GAIN × the distance still to go, at most LAT_MAX. */
 const LAT_GAIN = 18;
 const LAT_MAX = 16;
+
+/** A hop lasts this many seconds and carries her over anything but a hedge. */
+export const HOP_TIME = 0.55;
+/** Hops she can save up, and the seconds it takes to earn each one back. */
+export const HOP_CHARGES = 3;
+const HOP_RECHARGE = 2.5;
 
 /** Half the fairy's size for collisions: across in lanes, along the path in units. */
 const FAIRY_HALF_W = 0.26;
@@ -40,15 +44,15 @@ const AHEAD = 90;
 
 export type Phase = 'title' | 'countdown' | 'play' | 'over';
 
-/** The four panels that steer: ← and → on each pad. */
-export type Panel = 'p1l' | 'p1r' | 'p2l' | 'p2r';
-export const PANELS: readonly Panel[] = ['p1l', 'p1r', 'p2l', 'p2r'];
-/** Tapping a panel sends the fairy to this lane... */
-export const TAP_LANE: Readonly<Record<Panel, number>> = { p1l: 1, p1r: 2, p2l: 3, p2r: 4 };
-/** ...and holding one of the outer two, to the edge lane beyond it. */
-export const HOLD_LANE: Readonly<Partial<Record<Panel, number>>> = { p1l: 0, p2r: 5 };
-
-export type Input = Record<Panel, { down: boolean; pressed: boolean }>;
+/**
+ * What the pads asked for this frame. Side by side, the two pads' ← ↓ → panels make six
+ * columns, one per lane, and ↑ on either pad hops.
+ */
+export interface Input {
+  /** Lanes whose panels were stepped on this frame, in order: the last one wins. */
+  lanes: number[];
+  hop: boolean;
+}
 
 export type Kind = 'pumpkin' | 'turnip' | 'rock' | 'toadstool' | 'stump' | 'hedge' | 'log';
 
@@ -78,18 +82,27 @@ export interface Fairy {
   vx: number;
   /** The lane she's heading for. */
   target: number;
-  /** The panel that set the target and when, to tell a tap from a hold. */
-  steer: { panel: Panel; at: number; held: boolean } | null;
+  /** Seconds left of the hop she's in; 0 on the ground. */
+  hop: number;
+  /** Hops saved up, at most HOP_CHARGES; the fraction is the next one building up. */
+  hopCharge: number;
   lives: number;
   /** Seconds left of passing through things after a crash. */
   ghost: number;
   /** -1 or 1 while something beside her stops her going that way, else 0. */
   pressing: number;
   crashes: number;
+  hops: number;
   alive: boolean;
 }
 
-export type GameEvent = { type: 'crash'; obstacle: Obstacle } | { type: 'go' } | { type: 'over' };
+export type GameEvent =
+  | { type: 'crash'; obstacle: Obstacle }
+  | { type: 'hop' }
+  /** ↑ with no hops saved up. */
+  | { type: 'nohop' }
+  | { type: 'go' }
+  | { type: 'over' };
 
 /** A way through that the generator keeps open. */
 interface Thread {
@@ -149,7 +162,19 @@ export function newGame(attract: boolean, seed = (Math.random() * 2 ** 32) >>> 0
     startScroll: 0,
     speed: attract ? TITLE_SPEED : START_SPEED,
     slow: 0,
-    fairy: { x: 2.5, vx: 0, target: 2.5, steer: null, lives: LIVES, ghost: 0, pressing: 0, crashes: 0, alive: true },
+    fairy: {
+      x: 2.5,
+      vx: 0,
+      target: 2.5,
+      hop: 0,
+      hopCharge: HOP_CHARGES,
+      lives: LIVES,
+      ghost: 0,
+      pressing: 0,
+      crashes: 0,
+      hops: 0,
+      alive: true,
+    },
     obstacles: [],
     events: [],
     attract,
@@ -190,8 +215,13 @@ export function update(game: Game, dt: number, input: Input): void {
   if (game.phase === 'play') game.time += dt;
 
   const fairy = game.fairy;
-  if (fairy.alive && game.autopilot) fairy.target = botTarget(game);
-  else if (fairy.alive && game.phase !== 'title') steer(game, input);
+  if (fairy.alive && game.autopilot) {
+    autopilot(game, dt);
+  } else if (fairy.alive && game.phase !== 'title') {
+    for (const lane of input.lanes) fairy.target = lane;
+    if (input.hop) hop(game);
+  }
+  fairy.hopCharge = Math.min(HOP_CHARGES, fairy.hopCharge + dt / HOP_RECHARGE);
 
   game.slow = Math.max(0, game.slow - dt / 1.5);
   if (game.phase === 'title') game.speed = TITLE_SPEED;
@@ -211,29 +241,19 @@ function setPhase(game: Game, phase: Phase): void {
   game.phaseTime = 0;
 }
 
-// ---- Steering ----
+// ---- Hopping ----
 
-/**
- * Tap a panel to head for its lane. Holding the outer ones (pad 1 ←, pad 2 →) for HOLD_TIME
- * goes one lane further, to the edge, and letting go comes back. The latest press always wins.
- */
-function steer(game: Game, input: Input): void {
+function hop(game: Game): void {
   const fairy = game.fairy;
-  for (const panel of PANELS) {
-    if (!input[panel].pressed) continue;
-    fairy.target = TAP_LANE[panel];
-    fairy.steer = { panel, at: game.clock, held: false };
+  if (fairy.hop > 0) return;
+  if (fairy.hopCharge < 1) {
+    game.events.push({ type: 'nohop' });
+    return;
   }
-  const steering = fairy.steer;
-  if (!steering) return;
-  const edge = HOLD_LANE[steering.panel];
-  if (!input[steering.panel].down) {
-    if (steering.held) fairy.target = TAP_LANE[steering.panel];
-    fairy.steer = null;
-  } else if (edge !== undefined && !steering.held && game.clock - steering.at >= HOLD_TIME) {
-    steering.held = true;
-    fairy.target = edge;
-  }
+  fairy.hop = HOP_TIME;
+  fairy.hopCharge -= 1;
+  fairy.hops++;
+  game.events.push({ type: 'hop' });
 }
 
 // ---- Moving and crashing ----
@@ -243,6 +263,8 @@ function step(game: Game, dt: number): void {
   const frontBefore = game.scroll + FAIRY_HALF_D;
   game.scroll += game.speed * dt;
   fairy.ghost = Math.max(0, fairy.ghost - dt);
+  fairy.hop = Math.max(0, fairy.hop - dt);
+  const flying = fairy.hop > 0;
   const back = game.scroll - FAIRY_HALF_D;
   const front = game.scroll + FAIRY_HALF_D;
   const solid = fairy.alive && fairy.ghost <= 0;
@@ -251,6 +273,7 @@ function step(game: Game, dt: number): void {
   let inside = false;
   for (const o of game.obstacles) {
     if (o.smashed || o.d0 > front || o.d1 < back) continue;
+    if (flying && o.kind !== 'hedge') continue; // she's above it (land on it, though, and she crashes)
     const overlap = Math.min(fairy.x + FAIRY_HALF_W, o.x1) - Math.max(fairy.x - FAIRY_HALF_W, o.x0);
     if (overlap <= 0) continue;
     if (!solid) {
@@ -275,6 +298,7 @@ function step(game: Game, dt: number): void {
   if (fairy.alive && fairy.ghost <= 0) {
     for (const o of game.obstacles) {
       if (o.smashed || o.d0 > front || o.d1 < back) continue;
+      if (flying && o.kind !== 'hedge') continue;
       if (o.x1 <= fairy.x - FAIRY_HALF_W + 1e-6) lo = Math.max(lo, o.x1 + FAIRY_HALF_W);
       else if (o.x0 >= fairy.x + FAIRY_HALF_W - 1e-6) hi = Math.min(hi, o.x0 - FAIRY_HALF_W);
     }
@@ -308,6 +332,7 @@ function crash(game: Game, o: Obstacle): void {
   if (fairy.lives <= 0) {
     fairy.alive = false;
     fairy.pressing = 0;
+    fairy.hop = 0;
     setPhase(game, 'over');
     game.events.push({ type: 'over' });
   }
@@ -340,13 +365,9 @@ function plannedSpeed(game: Game, d: number): number {
   return game.attract ? TITLE_SPEED : speedAt(d);
 }
 
-/**
- * Rows a sideways gap needs to stay open for the fairy to get `shift` lanes across at speed v,
- * with time to hold for an edge lane.
- */
-function doorRows(shift: number, v: number, edge: boolean): number {
-  const seconds = 0.18 + shift / LAT_MAX + (edge ? HOLD_TIME : 0);
-  return Math.ceil((v * seconds + 1.1) / ROW_LEN);
+/** Rows a sideways gap needs to stay open for the fairy to get `shift` lanes across at speed v. */
+function doorRows(shift: number, v: number): number {
+  return Math.ceil((v * (0.18 + shift / LAT_MAX) + 1.1) / ROW_LEN);
 }
 
 function generate(game: Game): void {
@@ -380,7 +401,7 @@ function addStretch(game: Game): void {
     length = kind === 'hedges' ? Math.round(16 + 18 * D + rand() * 8) : Math.round(12 + 14 * D + rand() * 6);
   }
   // Gates: a fallen log across the path every few rows, with gaps where the threads are.
-  const spacing = Math.max(5, doorRows(3, v, true) + 1);
+  const spacing = Math.max(5, doorRows(3, v) + 2);
   if (kind === 'gates') length = spacing * (3 + Math.floor(3 * D + rand() * 2));
 
   const rows: Uint8Array[] = [];
@@ -453,7 +474,7 @@ function advanceThreads(game: Game, kind: Stretch, D: number, v: number, forceSh
       if (to !== t.lane) {
         t.from = t.lane;
         t.lane = to;
-        t.door = doorRows(Math.abs(to - t.from), v, to === 0 || to === COLS - 1);
+        t.door = doorRows(Math.abs(to - t.from), v);
       }
       t.fresh = false;
     }
@@ -561,6 +582,45 @@ function addObstacle(game: Game, kind: Kind, lane: number, lanes: number, row: n
 }
 
 // ---- Autopilot (title screen, and headless testing) ----
+
+/** Steer by botTarget, hop over anything low that's about to hit, and on the title screen hop now and then for show. */
+function autopilot(game: Game, dt: number): void {
+  const fairy = game.fairy;
+  fairy.target = botTarget(game);
+  if (fairy.hop > 0 || fairy.hopCharge < 1) return;
+  const showOff = game.attract && Math.random() < dt / 2.5;
+  if ((showOff || lowThingAhead(game)) && landingClear(game)) hop(game);
+}
+
+/** Is something she could hop over about to reach her? */
+function lowThingAhead(game: Game): boolean {
+  const f = game.fairy;
+  const front = game.scroll + FAIRY_HALF_D;
+  return game.obstacles.some(
+    (o) =>
+      !o.smashed &&
+      o.kind !== 'hedge' &&
+      o.d0 > front &&
+      o.d0 < front + game.speed * 0.15 &&
+      o.x0 < f.x + FAIRY_HALF_W &&
+      o.x1 > f.x - FAIRY_HALF_W,
+  );
+}
+
+/** Would a hop now meet no hedge on the way and come down somewhere clear? */
+function landingClear(game: Game): boolean {
+  const f = game.fairy;
+  const land = game.scroll + HOP_TIME * game.speed;
+  const lo = Math.min(f.x, f.target) - FAIRY_HALF_W;
+  const hi = Math.max(f.x, f.target) + FAIRY_HALF_W;
+  return !game.obstacles.some(
+    (o) =>
+      !o.smashed &&
+      o.x0 < hi &&
+      o.x1 > lo &&
+      (o.kind === 'hedge' ? o.d0 < land + 1 && o.d1 > game.scroll : o.d0 < land + 0.7 && o.d1 > land - 0.7),
+  );
+}
 
 const BOT_LOOK = 22;
 const TRAPPED = 1e9;

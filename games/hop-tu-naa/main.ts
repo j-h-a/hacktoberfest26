@@ -1,26 +1,34 @@
 import '../../src/lib/theme.css';
 import './style.css';
 import { Pads } from '../../src/lib/pads';
-import { COUNTDOWN, HOLD_LANE, HOLD_TIME, PANELS, TAP_LANE, distance, newGame, update, type Game, type Input, type Panel } from './game';
+import { COUNTDOWN, HOP_CHARGES, distance, newGame, update, type Game, type Input } from './game';
 import { View } from './scene';
 
 /** Seconds after the night ends before START begins another, so a last stomp doesn't skip the result. */
 const RESTART_DELAY = 1.5;
 const BEST_KEY = 'pad-arcade:hop-tu-naa:best';
 
-/** Which pad and arrow each steering panel is. */
-const PANEL_BUTTONS: Record<Panel, [player: number, button: 'left' | 'right']> = {
-  p1l: [0, 'left'],
-  p1r: [0, 'right'],
-  p2l: [1, 'left'],
-  p2r: [1, 'right'],
-};
+/** Lane i's panel. Side by side, the pads make six columns: ← ↓ → on pad 1, then on pad 2. */
+const LANE_PANELS = [
+  [0, 'left'],
+  [0, 'down'],
+  [0, 'right'],
+  [1, 'left'],
+  [1, 'down'],
+  [1, 'right'],
+] as const;
 
 const canvas = document.querySelector<HTMLCanvasElement>('#scene')!;
 const overlay = document.querySelector<HTMLElement>('#overlay')!;
 const distanceText = document.querySelector<HTMLElement>('#distance')!;
 const legs = Array.from(document.querySelectorAll<SVGGElement>('#legs .leg'));
 const lanes = Array.from(document.querySelectorAll<HTMLElement>('#lanes .lane'));
+const hops = Array.from(document.querySelectorAll<HTMLElement>('#lanes .hop'));
+// One pip per hop she can save up, on each pad's ↑.
+const pips = hops.map((hop) => {
+  const holder = hop.querySelector('.pips')!;
+  return Array.from({ length: HOP_CHARGES }, () => holder.appendChild(document.createElement('i')));
+});
 const flash = document.querySelector<HTMLElement>('#flash')!;
 
 const view = new View(canvas);
@@ -38,12 +46,11 @@ addEventListener('resize', resize);
 resize();
 
 function readInput(): Input {
-  const input = {} as Input;
-  for (const panel of PANELS) {
-    const [player, button] = PANEL_BUTTONS[panel];
-    input[panel] = { down: pads.isDown(button, player), pressed: pads.wasPressed(button, player) };
-  }
-  return input;
+  const lanes: number[] = [];
+  LANE_PANELS.forEach(([player, button], lane) => {
+    if (pads.wasPressed(button, player)) lanes.push(lane);
+  });
+  return { lanes, hop: pads.wasPressed('up') };
 }
 
 function loadBest(): number {
@@ -75,23 +82,24 @@ const TITLE = `
     <h1 class="logo">Hop-tu-Naa</h1>
     <p class="tagline">A Manx fairy's dash through the woods on Hop-tu-Naa night</p>
     <ul class="how">
-      <li>Stand across <b>both pads</b> and step on an <b>←</b> or <b>→</b> to fly to its lane.</li>
-      <li><b>Hold</b> pad 1's <b>←</b> or pad 2's <b>→</b> to reach the edge lanes. Step off to come back in.</li>
-      <li>Dodge the pumpkins, turnips, rocks and hedges. You can't slip sideways past anything
-        beside you, so pick your gap early.</li>
+      <li>Stand across <b>both pads</b>. Their <b>←</b> <b>↓</b> <b>→</b> panels are the six lanes, left to
+        right: step on one to fly to its lane.</li>
+      <li>Step on <b>↑</b> on either pad to <b>hop</b> over pumpkins, turnips, rocks and logs, but not
+        hedges. You can save up ${HOP_CHARGES} hops, and they come back slowly.</li>
+      <li>You can't slip sideways past anything beside you, so pick your gap early.</li>
       <li>Three crashes and the night's over.</li>
     </ul>
     <p class="start">Press START</p>
   </div>`;
 
 function overHtml(): string {
-  const metres = Math.floor(distance(game));
+  const f = game.fairy;
   return `
     <div class="panel">
       <h1 class="over">Oie vie!</h1>
       <p class="tagline">Good night, little fairy</p>
-      <p class="score">${metres} m</p>
-      <p class="best">${newBest ? 'A new best!' : `Best: ${best} m`}</p>
+      <p class="score">${Math.floor(distance(game))} m</p>
+      <p class="best">${newBest ? 'A new best!' : `Best: ${best} m`} · ${f.hops} hop${f.hops === 1 ? '' : 's'}</p>
       <p class="start later">Press START to fly again · hold SELECT for the menu</p>
     </div>`;
 }
@@ -117,32 +125,26 @@ function updateHud(): void {
   setText(distanceText, game.phase === 'play' || game.phase === 'over' ? `${Math.floor(distance(game))} m` : '');
   legs.forEach((leg, i) => leg.classList.toggle('lost', i >= f.lives));
 
-  // The lane guide: where she is, where she's heading, which panels are down, how long the hold has to go.
+  // The guide: where she is, where she's heading, which panels are down, and the hops saved up.
   const here = Math.round(f.x);
-  const held = new Set(PANELS.filter((p) => readPanel(p)));
   lanes.forEach((el, lane) => {
+    const [player, button] = LANE_PANELS[lane];
     el.classList.toggle('here', lane === here);
     el.classList.toggle('target', lane === f.target);
-    const panel = PANELS.find((p) => TAP_LANE[p] === lane || HOLD_LANE[p] === lane)!;
-    el.classList.toggle('down', held.has(panel));
+    el.classList.toggle('down', pads.isDown(button, player));
   });
-  for (const panel of ['p1l', 'p2r'] as const) {
-    const el = lanes[HOLD_LANE[panel]!];
-    const s = f.steer;
-    const progress = s?.panel === panel ? (s.held ? 1 : Math.min(1, (game.clock - s.at) / HOLD_TIME)) : 0;
-    el.style.setProperty('--hold', String(progress));
-  }
+  hops.forEach((el, player) => {
+    el.classList.toggle('down', pads.isDown('up', player));
+    el.classList.toggle('flying', f.hop > 0);
+    pips[player].forEach((pip, i) => pip.style.setProperty('--fill', String(Math.min(1, Math.max(0, f.hopCharge - i)))));
+  });
 }
 
-function readPanel(panel: Panel): boolean {
-  const [player, button] = PANEL_BUTTONS[panel];
-  return pads.isDown(button, player);
-}
-
-function flashScreen(): void {
-  flash.classList.remove('on');
-  void flash.offsetWidth; // restart the animation
-  flash.classList.add('on');
+/** Restart a one-shot CSS animation on an element. */
+function replay(el: HTMLElement, className: string): void {
+  el.classList.remove(className);
+  void el.offsetWidth;
+  el.classList.add(className);
 }
 
 let last = performance.now();
@@ -154,7 +156,8 @@ function frame(now: number): void {
   if (canStart && pads.wasPressed('start')) game = newGame(false);
   update(game, dt, readInput());
   for (const event of game.events) {
-    if (event.type === 'crash' && !game.attract) flashScreen();
+    if (event.type === 'crash' && !game.attract) replay(flash, 'on');
+    if (event.type === 'nohop') for (const el of hops) replay(el, 'denied');
     if (event.type === 'over') saveBest();
   }
   view.render(game, dt);

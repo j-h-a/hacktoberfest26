@@ -18,16 +18,21 @@
       <g class="leg" transform="rotate(120)"><path d="M0 0 L-3 -30 L22 -39 L30 -33" /></g>
       <g class="leg" transform="rotate(240)"><path d="M0 0 L-3 -30 L22 -39 L30 -33" /></g>
     </svg>
+    <!-- Laid out like the two mats: ↑ hops, and ← ↓ → on each pad are the six lanes. -->
     <div id="lanes">
-      <div class="pad p1" data-name="PAD 1">
-        <div class="lane"><b>←</b><small>hold</small><i class="hold"></i></div>
-        <div class="lane"><b>←</b><small>tap</small></div>
-        <div class="lane"><b>→</b><small>tap</small></div>
+      <div class="pad p1">
+        <span class="name">PAD 1</span>
+        <div class="hop"><b>↑</b><span class="pips"></span></div>
+        <div class="lane"><b>←</b></div>
+        <div class="lane"><b>↓</b></div>
+        <div class="lane"><b>→</b></div>
       </div>
-      <div class="pad p2" data-name="PAD 2">
-        <div class="lane"><b>←</b><small>tap</small></div>
-        <div class="lane"><b>→</b><small>tap</small></div>
-        <div class="lane"><b>→</b><small>hold</small><i class="hold"></i></div>
+      <div class="pad p2">
+        <span class="name">PAD 2</span>
+        <div class="hop"><b>↑</b><span class="pips"></span></div>
+        <div class="lane"><b>←</b></div>
+        <div class="lane"><b>↓</b></div>
+        <div class="lane"><b>→</b></div>
       </div>
     </div>
     <div id="overlay"></div>

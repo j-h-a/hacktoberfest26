@@ -9,12 +9,19 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { COLS, ROW_LEN, clamp, lerp, mulberry32, type Game, type Kind } from './game';
+import { COLS, HOP_TIME, ROW_LEN, clamp, lerp, mulberry32, type Fairy, type Game, type Kind } from './game';
 import * as M from './models';
 
 /** The misty blue at the horizon, which the fog fades everything into. */
 const FOG = '#232c52';
 const UP = new THREE.Vector3(0, 1, 0);
+/** How high a hop takes her, in units. */
+const HOP_HEIGHT = 1.15;
+
+/** How far up her hop she is, 0 to 1 (0 on the ground). */
+function liftOf(f: Fairy): number {
+  return f.hop > 0 ? Math.sin(Math.PI * (1 - f.hop / HOP_TIME)) : 0;
+}
 
 /** What a crash throws out, by what she hit. */
 const BURST_COLOURS: Record<Kind, string[]> = {
@@ -185,6 +192,8 @@ export class View {
   shake = 0;
   camX = 0;
   laneGlowX = 0;
+  flapPhase = 0;
+  hopping = false;
   width = 1;
   height = 1;
   /** Highest pixel ratio to render at; lowered if frames are slow. */
@@ -381,9 +390,11 @@ export class View {
 
   showEvents(game: Game): void {
     const color = new THREE.Color();
+    const x = M.laneX(game.fairy.x);
     for (const event of game.events) {
+      if (event.type === 'hop') this.puff(x, -game.scroll, 24, '#bff8ff', 2.6);
+      if (event.type === 'nohop') this.puff(x, -game.scroll, 8, '#5a6080', 1);
       if (event.type !== 'crash') continue;
-      const x = M.laneX(game.fairy.x);
       const z = -game.scroll - 0.4;
       const colours = BURST_COLOURS[event.obstacle.kind];
       for (let i = 0; i < 70; i++) {
@@ -397,9 +408,20 @@ export class View {
     }
   }
 
+  /** A ring of sparkles spreading over the ground from (x, z). */
+  puff(x: number, z: number, count: number, colour: string, speed: number): void {
+    const color = new THREE.Color(colour);
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      const s = speed * (0.7 + Math.random() * 0.6);
+      this.dust.emit(x, 0.15, z, Math.cos(a) * s, 0.4 + Math.random() * 0.6, Math.sin(a) * s * 0.6, color, 0.5 + Math.random() * 0.3);
+    }
+  }
+
   animateObstacles(game: Game): void {
     const t = this.time;
     const fx = M.laneX(game.fairy.x);
+    const lift = liftOf(game.fairy);
     this.faceMaterials.forEach((m, i) => {
       m.emissiveIntensity = 2.2 + 0.6 * Math.sin(t * 9 + i * 2.1) * Math.sin(t * 5.3 + i) - (Math.random() < 0.03 ? 0.9 : 0);
     });
@@ -414,6 +436,7 @@ export class View {
       const phase = t * 7 + id * 1.7;
       view.face.position.y = close * Math.max(0, Math.sin(phase)) * 0.14;
       view.face.rotation.z = close * Math.sin(phase * 0.5) * 0.07;
+      view.face.rotation.x = close * -0.5 * lift; // and look up as she hops over
       if (ahead > -1.5 && ahead < 26) near.push({ view, ahead });
     }
     near.sort((a, b) => a.ahead - b.ahead);
@@ -431,20 +454,31 @@ export class View {
     const x = M.laneX(f.x);
     this.fall = f.alive ? 0 : Math.min(1, this.fall + dt * 1.2);
     const drop = 1 - (1 - this.fall) ** 3;
-    root.position.set(x, lerp(0.8 + Math.sin(t * 2.6) * 0.06, 0.3, drop), 0);
+    const lift = liftOf(f);
+    const hopP = f.hop > 0 ? 1 - f.hop / HOP_TIME : 0;
+    root.position.set(x, lerp(0.8 + Math.sin(t * 2.6) * 0.06, 0.3, drop) + lift * HOP_HEIGHT, 0);
     // Bank into turns, lean on whatever's in the way, and spin after a crash.
     const bank = clamp(-f.vx * 0.045, -0.55, 0.55) - f.pressing * 0.32;
     this.bank += (bank - this.bank) * Math.min(1, dt * 12);
     this.spin = Math.max(0, this.spin - dt * 1.4);
-    body.rotation.set(lerp(-0.14, 0.9, drop), this.spin * this.spin * 9 + Math.sin(t * 1.3) * 0.08, this.bank + f.pressing * Math.sin(t * 40) * 0.04);
+    const twirl = hopP * hopP * (3 - 2 * hopP) * Math.PI * 2; // one turn per hop
+    body.rotation.set(
+      lerp(-0.14, 0.9, drop) - lift * 0.2,
+      this.spin * this.spin * 9 + Math.sin(t * 1.3) * 0.08 + twirl,
+      this.bank + f.pressing * Math.sin(t * 40) * 0.04,
+    );
     root.visible = !f.alive || f.ghost <= 0 || Math.floor(t * 18) % 2 === 0;
-    const flap = Math.sin(t * (f.alive ? 30 : 4));
+    this.flapPhase += dt * (!f.alive ? 4 : f.hop > 0 ? 46 : 30);
+    const flap = Math.sin(this.flapPhase);
     for (const wing of wings) wing.pivot.rotation.y = -wing.side * (0.25 + 0.25 * (1 + flap)) * (wing.upper ? 1 : 0.8);
     glow.material.opacity = (0.32 + 0.06 * Math.sin(t * 5)) * (1 - drop * 0.6);
     light.intensity = (3 + Math.sin(t * 7) * 0.3) * (1 - drop * 0.5);
 
     this.halo.position.x = x;
-    this.halo.material.opacity = 0.45 - drop * 0.25;
+    this.halo.material.opacity = (0.45 - drop * 0.25) * (1 - 0.6 * lift);
+    this.halo.scale.setScalar(1 + lift * 0.6);
+    if (this.hopping && f.hop <= 0 && f.alive) this.puff(x, -game.scroll, 18, '#ffe9a8', 2);
+    this.hopping = f.hop > 0;
     this.laneGlowX += (M.laneX(clamp(f.target, 0, COLS - 1)) - this.laneGlowX) * Math.min(1, dt * 20);
     this.laneGlow.position.x = this.laneGlowX;
     const heading = Math.abs(f.target - f.x) > 0.3;

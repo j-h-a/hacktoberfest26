@@ -586,6 +586,7 @@ export function makeObstacle(o: Obstacle): ObstacleView {
       const parts = faceParts();
       const pumpkin = o.kind === 'pumpkin';
       const face = new THREE.Group();
+      face.rotation.order = 'YXZ';
       const body = new THREE.Mesh(pumpkin ? parts.pumpkin : parts.turnip, pick(pumpkin ? parts.pumpkinMats : parts.turnipMats));
       body.position.y = pumpkin ? 0.39 : 0.6;
       const top = new THREE.Mesh(pumpkin ? parts.stem : parts.leaves, flatMaterial);
