@@ -1,0 +1,207 @@
+body {
+  background:
+    radial-gradient(1100px 620px at 10% -12%, rgb(58 214 255 / 0.2), transparent 62%),
+    radial-gradient(1000px 620px at 108% 112%, rgb(255 79 179 / 0.18), transparent 62%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+.menu {
+  width: min(1180px, 100% - 32px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 6vh 0 4vh;
+  display: flex;
+  flex-direction: column;
+  gap: 5vh;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(2.8rem, 8vw, 6rem);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1;
+  background: linear-gradient(90deg, var(--p1), var(--p2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 28px rgb(255 79 179 / 0.3));
+}
+
+.tagline {
+  margin: 1rem 0 0;
+  color: var(--muted);
+  font-size: clamp(1.1rem, 2.2vw, 1.5rem);
+}
+
+.tagline b {
+  color: var(--text);
+}
+
+.games {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 28px;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  padding: 30px 30px 26px;
+  border-radius: 22px;
+  border: 3px solid var(--line);
+  background: linear-gradient(160deg, var(--surface-2), var(--surface));
+  color: inherit;
+  text-decoration: none;
+  outline: none;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.card[data-selected] {
+  border-color: var(--accent);
+  transform: translateY(-6px) scale(1.02);
+  box-shadow:
+    0 0 0 6px rgb(255 216 74 / 0.16),
+    0 22px 60px rgb(0 0 0 / 0.5);
+}
+
+.card-title {
+  font-size: clamp(1.6rem, 3vw, 2.1rem);
+  font-weight: 800;
+}
+
+.card-desc {
+  flex: 1;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1.45;
+}
+
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag {
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgb(255 255 255 / 0.05);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.card-go {
+  position: absolute;
+  top: -16px;
+  right: 22px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #1b1600;
+  font-weight: 800;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+.card[data-selected] .card-go {
+  opacity: 1;
+  transform: none;
+}
+
+footer {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 32px;
+}
+
+.players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pill {
+  --player: var(--p1);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 2px solid var(--line);
+  background: var(--surface);
+  transition:
+    border-color 0.1s,
+    box-shadow 0.1s;
+}
+
+.pill.p2 {
+  --player: var(--p2);
+}
+
+.pill b {
+  color: var(--player);
+}
+
+.pill-detail {
+  color: var(--muted);
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.pill.connected .dot {
+  background: var(--player);
+  box-shadow: 0 0 12px var(--player);
+}
+
+.pill.active {
+  border-color: var(--player);
+  box-shadow: 0 0 18px var(--player);
+}
+
+.help {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.help b {
+  color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .card-go {
+    transition: none;
+  }
+
+  .card[data-selected] {
+    transform: none;
+  }
+}

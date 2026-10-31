@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Input Tester · Pad Arcade</title>
+    <script type="module" src="./main.ts"></script>
+  </head>
+  <body>
+    <header class="bar">
+      <a class="back" id="back" href="/">← Menu</a>
+      <h1>Input Tester</h1>
+      <button type="button" id="swap">Swap P1 ⇄ P2</button>
+    </header>
+
+    <p class="notice" id="notice" hidden></p>
+
+    <main class="players" id="players"></main>
+
+    <section class="bottom">
+      <div>
+        <h2>Events</h2>
+        <ol class="log" id="log"></ol>
+      </div>
+      <div class="help">
+        <h2>Tips</h2>
+        <ul>
+          <li>Put each L-TEK Prime in its <b>Dancepad</b> profile: the Start/Select buttons glow <b>green + red</b>.</li>
+          <li>Stepping on the left pad lights up Player 2? Press <b>Swap P1 ⇄ P2</b>.</li>
+          <li>
+            Wrong panel lighting up? Note which raw button number lights when you step on it, and fix the mapping in
+            <code>src/lib/pads.ts</code>.
+          </li>
+          <li>Hold <b>SELECT</b> (or <kbd>Esc</kbd>) for a second to go back to the menu.</li>
+          <li>
+            Keyboard: P1 is <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>,
+            Start <kbd>Enter</kbd>/<kbd>E</kbd>, Select <kbd>Esc</kbd>/<kbd>Q</kbd>. P2 is
+            <kbd>I</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd>, Start <kbd>O</kbd>, Select <kbd>U</kbd>.
+          </li>
+        </ul>
+      </div>
+    </section>
+  </body>
+</html>

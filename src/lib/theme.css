@@ -1,0 +1,66 @@
+/* Shared look for the menu and DOM-based games. Canvas/WebGL games can ignore it. */
+:root {
+  color-scheme: dark;
+  --bg: #090a14;
+  --surface: #12142a;
+  --surface-2: #1b1e3d;
+  --line: #2c3060;
+  --text: #f3f4ff;
+  --muted: #a4a9d2;
+  --p1: #3ad6ff;
+  --p2: #ff4fb3;
+  --accent: #ffd84a;
+  --font: ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 2px solid var(--line);
+  background: var(--surface-2);
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+a {
+  color: var(--p1);
+}
+
+kbd {
+  font: inherit;
+  font-size: 0.85em;
+  padding: 1px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  border-bottom-width: 3px;
+  background: var(--surface-2);
+}

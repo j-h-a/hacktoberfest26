@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Pad Arcade</title>
+    <script type="module" src="/src/menu/main.ts"></script>
+  </head>
+  <body>
+    <main class="menu">
+      <header>
+        <h1 class="title">Pad Arcade</h1>
+        <p class="tagline">Step <b>← →</b> to choose a game, press <b>START</b> to play.</p>
+      </header>
+
+      <ul class="games" id="games"></ul>
+
+      <footer>
+        <div class="players" id="players"></div>
+        <p class="help">
+          In a game, hold <b>SELECT</b> (or <kbd>Esc</kbd>) for a second to come back here.
+          Keyboard: <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> and <kbd>Enter</kbd>.
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,325 @@
+body {
+  padding: 20px clamp(16px, 3vw, 40px) 40px;
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+
+.bar h1 {
+  flex: 1;
+  margin: 0;
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+}
+
+.back {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 2px solid var(--line);
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.notice {
+  margin: 18px 0 0;
+  padding: 14px 18px;
+  border-radius: 12px;
+  border: 2px solid rgb(255 216 74 / 0.5);
+  background: rgb(255 216 74 / 0.1);
+  color: #ffe998;
+  font-size: 1.1rem;
+}
+
+.players {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 540px), 1fr));
+  gap: 24px;
+  margin-top: 20px;
+}
+
+.player {
+  --player: var(--p1);
+  padding: 20px 24px 24px;
+  border-radius: 20px;
+  border: 2px solid var(--line);
+  background: var(--surface);
+}
+
+.player.p2 {
+  --player: var(--p2);
+}
+
+.player h2 {
+  margin: 0;
+  color: var(--player);
+  font-size: 1.6rem;
+}
+
+.device {
+  margin: 4px 0 16px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.player-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+/* The 3x3 pad diagram */
+.pad {
+  width: min(100%, 320px);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 8px;
+  border-radius: 14px;
+  border: 2px solid var(--line);
+  background: #05060d;
+}
+
+.pad > * {
+  aspect-ratio: 1;
+  border-radius: 10px;
+}
+
+.tile {
+  background: #0d0f20;
+}
+
+.panel {
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--line);
+  background: var(--surface-2);
+  transition:
+    background 0.05s,
+    box-shadow 0.05s;
+}
+
+.panel svg {
+  width: 62%;
+  height: 62%;
+  fill: var(--muted);
+}
+
+.panel[data-button='down'] svg {
+  rotate: 180deg;
+}
+
+.panel[data-button='left'] svg {
+  rotate: -90deg;
+}
+
+.panel[data-button='right'] svg {
+  rotate: 90deg;
+}
+
+.panel.on {
+  border-color: #fff;
+  background: var(--player);
+  box-shadow: 0 0 26px var(--player);
+}
+
+.panel.on svg {
+  fill: #fff;
+}
+
+.smalls {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  justify-content: center;
+  gap: 4px;
+  padding: 10% 4px 0;
+}
+
+.small {
+  padding: 3px 5px;
+  border-radius: 999px;
+  border: 2px solid var(--line);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.small.on {
+  border-color: #fff;
+  background: var(--player);
+  color: #06070f;
+  box-shadow: 0 0 14px var(--player);
+}
+
+/* What each button reads */
+.mapping {
+  flex: 1;
+  min-width: 220px;
+  border-collapse: collapse;
+}
+
+.mapping th {
+  padding: 4px 10px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.mapping td {
+  padding: 7px 10px;
+  border-top: 1px solid var(--line);
+}
+
+.mapping tr.on td {
+  background: rgb(255 255 255 / 0.07);
+  color: var(--player);
+  font-weight: 700;
+}
+
+.mapping .count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mapping-name {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+/* Raw gamepad data */
+.raw h3 {
+  margin: 18px 0 8px;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.raw-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.raw-button {
+  min-width: 34px;
+  padding: 6px 0;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.raw-button.on {
+  border-color: #fff;
+  background: var(--accent);
+  color: #1b1600;
+  font-weight: 800;
+}
+
+.raw-axes {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.raw-axis {
+  display: grid;
+  grid-template-columns: 56px 1fr 52px;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.axis-track {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--surface-2);
+}
+
+.axis-track::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: calc(50% - 1px);
+  width: 2px;
+  background: var(--muted);
+}
+
+.axis-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 5px;
+  background: var(--accent);
+}
+
+.axis-value {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Log and tips */
+.bottom {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.bottom > div {
+  padding: 18px 22px;
+  border-radius: 20px;
+  border: 2px solid var(--line);
+  background: var(--surface);
+}
+
+.bottom h2 {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
+.log {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-height: 12lh;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.log .p1 b {
+  color: var(--p1);
+}
+
+.log .p2 b {
+  color: var(--p2);
+}
+
+.help ul {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.help b,
+.help code {
+  color: var(--text);
+}

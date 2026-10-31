@@ -1,0 +1,7 @@
+{
+  "title": "Input Tester",
+  "description": "Check every panel and button on both pads, see the raw gamepad data, and swap which pad is Player 1.",
+  "players": "1–2",
+  "tech": "HTML + CSS",
+  "order": 100
+}
