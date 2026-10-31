@@ -34,7 +34,7 @@ const cards = games.map((game, i) => {
   const card = el('a', 'card');
   card.href = game.url;
   const tags = el('span', 'card-tags');
-  if (game.players) tags.append(el('span', 'tag', `${game.players} players`));
+  if (game.players) tags.append(el('span', 'tag', `${game.players} player${game.players === '1' ? '' : 's'}`));
   if (game.tech) tags.append(el('span', 'tag', game.tech));
   card.append(
     el('span', 'card-title', game.title),
