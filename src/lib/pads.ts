@@ -11,6 +11,9 @@
  *
  * Holding Select for a second goes back to the menu on every page that has a
  * Pads (pass `{ exitToMenu: false }` to turn that off).
+ *
+ * Gamepad buttons already held as a page opens are ignored until they're
+ * released: they're left over from the previous page (see LEFTOVER_WINDOW_MS).
  */
 
 export const PAD_BUTTONS = ['up', 'down', 'left', 'right', 'select', 'start'] as const;
@@ -126,6 +129,16 @@ type Listener = (event: PadEvent) => void;
 const ORDER_KEY = 'pad-arcade:player-order';
 const EXIT_HOLD_MS = 1000;
 
+/**
+ * Gamepad buttons held when a page starts (or comes back into view) are left over from before, so
+ * they're ignored until they're released. They may not even be real: browsers stop reading gamepads
+ * while no page is, so a release during a page change can be missed, and the browser goes on
+ * reporting the button as held until that pad sends anything else. Only gamepads seen this soon
+ * after the first poll get this treatment: browsers hide the pads from each new page until a button
+ * is pressed on one, and that first press must still count.
+ */
+const LEFTOVER_WINDOW_MS = 500;
+
 export class Pads {
   #players = Array.from({ length: PLAYER_COUNT }, (_, i) => new PlayerState(i));
   readonly players: readonly Player[] = this.#players;
@@ -143,12 +156,17 @@ export class Pads {
   #overlay: HTMLElement | null = null;
   #frame = 0;
   #destroyed = false;
+  /** Per gamepad index: buttons held when it showed up, ignored until they're released. */
+  #leftovers = new Map<number, Set<PadButton>>();
+  /** Gamepads that show up before this time have their held buttons ignored. Set by the first poll. */
+  #leftoverUntil: number | null = null;
 
   constructor({ exitToMenu = true, autoPoll = true }: PadsOptions = {}) {
     this.#exitToMenu = exitToMenu;
     addEventListener('keydown', this.#onKeyDown);
     addEventListener('keyup', this.#onKeyUp);
     addEventListener('blur', this.#onBlur);
+    document.addEventListener('visibilitychange', this.#onVisibilityChange);
     if (autoPoll) {
       const loop = () => {
         if (this.#destroyed) return;
@@ -194,6 +212,7 @@ export class Pads {
   /** Read the gamepads and keyboard, update every player and fire events. Runs every frame unless autoPoll is off. */
   poll(): void {
     const now = performance.now();
+    const early = now < (this.#leftoverUntil ??= now + LEFTOVER_WINDOW_MS);
     this.gamepads = readGamepads();
     const assigned = assignGamepads(this.gamepads, this.#order);
     const events: PadEvent[] = [];
@@ -206,8 +225,14 @@ export class Pads {
       if (gamepad) {
         const { name, mapping } = mappingFor(gamepad);
         player.mappingName = name;
+        const leftovers = this.#leftoversFor(gamepad, mapping, early);
         for (const button of PAD_BUTTONS) {
-          if (mapping[button].some((binding) => isActive(gamepad, binding))) next.add(button);
+          const held = isHeld(gamepad, mapping, button);
+          if (leftovers.has(button)) {
+            if (!held) leftovers.delete(button); // released at last: it counts from now on
+          } else if (held) {
+            next.add(button);
+          }
         }
       }
       for (const code of [...this.#keysHeld, ...this.#keysTapped]) {
@@ -245,7 +270,18 @@ export class Pads {
     removeEventListener('keydown', this.#onKeyDown);
     removeEventListener('keyup', this.#onKeyUp);
     removeEventListener('blur', this.#onBlur);
+    document.removeEventListener('visibilitychange', this.#onVisibilityChange);
     this.#overlay?.remove();
+  }
+
+  /** The buttons to ignore on a gamepad. If it first shows up early on, that's whatever it has held. */
+  #leftoversFor(gamepad: Gamepad, mapping: Mapping, early: boolean): Set<PadButton> {
+    let leftovers = this.#leftovers.get(gamepad.index);
+    if (!leftovers) {
+      leftovers = new Set(early ? PAD_BUTTONS.filter((button) => isHeld(gamepad, mapping, button)) : []);
+      this.#leftovers.set(gamepad.index, leftovers);
+    }
+    return leftovers;
   }
 
   #check(player: number | undefined, test: (p: PlayerState) => boolean): boolean {
@@ -298,6 +334,17 @@ export class Pads {
   #onBlur = (): void => {
     this.#keysHeld.clear(); // key-ups are lost while another window has focus
   };
+
+  #onVisibilityChange = (): void => {
+    // Browsers stop reading gamepads for hidden pages too, so coming back is like opening a new page.
+    if (document.visibilityState !== 'visible') return;
+    this.#leftovers.clear();
+    this.#leftoverUntil = null;
+  };
+}
+
+function isHeld(gamepad: Gamepad, mapping: Mapping, button: PadButton): boolean {
+  return mapping[button].some((binding) => isActive(gamepad, binding));
 }
 
 function readGamepads(): Gamepad[] {
