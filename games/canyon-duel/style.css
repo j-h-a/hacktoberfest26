@@ -124,6 +124,15 @@ canvas {
   color: hsl(268, 100%, 74%);
 }
 
+.how .both {
+  color: hsl(50, 100%, 62%);
+}
+
+.how em {
+  font-style: normal;
+  color: var(--text);
+}
+
 .start {
   margin: 24px 0 0;
   color: var(--accent);

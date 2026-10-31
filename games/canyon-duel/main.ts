@@ -52,6 +52,8 @@ const TITLE = `
       <li>Hold <b>←</b> <b>→</b> to steer up the canyon. Rocks and walls knock you back.</li>
       <li>When an <b class="up">↑</b> or <b class="down">↓</b> arrow reaches your ship, step on that arrow to catch it
         and fire rocks into your rival's canyon.</li>
+      <li>For a <b class="both">↕</b> arrow, jump onto <b>↑</b> and <b>↓</b> together: it fires rocks
+        <em>and</em> lifts you back up the canyon.</li>
       <li>Get knocked off the bottom and you lose.</li>
     </ul>
     <p class="start">Press START</p>

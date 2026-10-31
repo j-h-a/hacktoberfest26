@@ -83,14 +83,14 @@ export function render(ctx: CanvasRenderingContext2D, game: Game, layout: Layout
 }
 
 /** Stroke the current path as a glowing vector line: a soft wide halo under a hot core. */
-function glow(ctx: CanvasRenderingContext2D, hue: number, width: number, alpha = 1, light = 60): void {
+function glow(ctx: CanvasRenderingContext2D, hue: number, width: number, alpha = 1, light = 60, sat = 100): void {
   if (alpha <= 0.01) return;
   ctx.globalAlpha = alpha * 0.3;
-  ctx.strokeStyle = `hsl(${hue}, 100%, ${light}%)`;
+  ctx.strokeStyle = `hsl(${hue}, ${sat}%, ${light}%)`;
   ctx.lineWidth = width * 3.5;
   ctx.stroke();
   ctx.globalAlpha = alpha;
-  ctx.strokeStyle = `hsl(${hue}, 100%, ${Math.min(94, light + 24)}%)`;
+  ctx.strokeStyle = `hsl(${hue}, ${sat}%, ${Math.min(94, light + 24)}%)`;
   ctx.lineWidth = width;
   ctx.stroke();
 }
@@ -210,15 +210,18 @@ function drawArrows(ctx: CanvasRenderingContext2D, game: Game, ship: Ship): void
   }
 }
 
+/**
+ * Rocks are a dull brown, so nobody mistakes them for something to collect. The ones the rival sent
+ * look just the same but red, with a flashing warning chevron before they come into view.
+ */
 function drawRocks(ctx: CanvasRenderingContext2D, game: Game, ship: Ship): void {
   for (const rock of game.rocks) {
     if (ship.smashed.has(rock.id)) continue;
     const y = screenY(game, rock.d);
     if (y < -rock.r || y > FIELD_H + rock.r) continue;
     tracePath(ctx, rockPoints(rock, game.clock), rock.x, y);
-    glow(ctx, rock.hue, 2.2);
+    glow(ctx, rock.hue, 2.2, 0.8, 30, 55);
   }
-  // Rocks the rival sent: spiky, in their colour, with a warning chevron before they appear.
   for (const rock of ship.incoming) {
     if (ship.smashed.has(rock.id)) continue;
     const y = screenY(game, rock.d);
@@ -227,15 +230,12 @@ function drawRocks(ctx: CanvasRenderingContext2D, game: Game, ship: Ship): void 
       ctx.moveTo(rock.x - 14, 10);
       ctx.lineTo(rock.x, 24);
       ctx.lineTo(rock.x + 14, 10);
-      glow(ctx, rock.hue, 2.4, Math.sin(game.clock * 18) > 0 ? 1 : 0.35);
+      glow(ctx, rock.hue, 2.4, Math.sin(game.clock * 18) > 0 ? 1 : 0.35, 40);
       continue;
     }
     if (y > FIELD_H + rock.r) continue;
-    const points = rockPoints(rock, game.clock);
-    tracePath(ctx, points, rock.x, y);
-    glow(ctx, rock.hue, 2.4);
-    tracePath(ctx, points.map(([px, py]): Point => [px * 0.45, py * 0.45]), rock.x, y);
-    glow(ctx, rock.hue + 30, 1.4, 0.5 + 0.5 * Math.sin(game.clock * 10));
+    tracePath(ctx, rockPoints(rock, game.clock), rock.x, y);
+    glow(ctx, rock.hue, 2.2, 1, 36);
   }
 }
 

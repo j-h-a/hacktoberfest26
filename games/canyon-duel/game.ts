@@ -31,6 +31,8 @@ const PERFECT_WINDOW = 0.06;
 const EARLY_WINDOW = 0.36;
 /** How far sideways an arrow can be from the ship and still be caught. */
 export const CATCH_REACH = 44;
+/** A jump arrow wants ↑ and ↓ both stepped on, this close together (seconds). */
+const JUMP_WINDOW = 0.15;
 /** An arrow's approach ring appears this many seconds before it arrives. */
 export const APPROACH_TIME = 1.2;
 const MISSILE_TIME = 0.7;
@@ -40,10 +42,14 @@ const CANYON_STEP = 700;
 export const WALL_STEP = 28;
 
 export const PLAYER_HUES = [193, 326];
-export const ARROW_HUES = { up: 110, down: 268 } as const;
+export const ARROW_HUES = { up: 110, down: 268, both: 50 } as const;
+/** Rocks in the canyon are brown, rocks a player sent are red. */
+const ROCK_HUE = 24;
+const SENT_ROCK_HUE = 0;
 
 export type Phase = 'title' | 'countdown' | 'play' | 'over';
-export type Arrow = 'up' | 'down';
+/** 'both' is a jump arrow: land on ↑ and ↓ together. */
+export type Arrow = 'up' | 'down' | 'both';
 export type Point = [number, number];
 
 export interface Rock {
@@ -114,6 +120,11 @@ export interface Ship {
   smashed: Set<number>;
   /** What happened to each arrow, for this ship. */
   arrows: Map<number, 'caught' | 'fumbled' | 'passed'>;
+  /** game.clock when ↑ and ↓ were last stepped on, to spot a jump split across frames. */
+  upAt: number;
+  downAt: number;
+  /** One foot has landed on a jump arrow: the other has until JUMP_WINDOW after `at`. */
+  halfJump: { id: number; at: number } | null;
   /** Extra rocks the other player sent. */
   incoming: Rock[];
   particles: Particle[];
@@ -179,8 +190,12 @@ export const SHIP_HULL: Point[] = [
 ];
 export const SHIP_COCKPIT: Point[] = [[0, -14], [4, -3], [0, 1], [-4, -3]];
 const ARROW: Point[] = [[0, -22], [21, -1], [9, -1], [9, 20], [-9, 20], [-9, -1], [-21, -1]];
+const JUMP_ARROW: Point[] = [
+  [0, -28], [20, -8], [8, -8], [8, 8], [20, 8], [0, 28], [-20, 8], [-8, 8], [-8, -8], [-20, -8],
+];
 
 export function arrowPoints(arrow: Arrow, size: number): Point[] {
+  if (arrow === 'both') return JUMP_ARROW.map(([x, y]): Point => [x * size, y * size]);
   const flip = arrow === 'up' ? 1 : -1;
   return ARROW.map(([x, y]): Point => [x * size, y * size * flip]);
 }
@@ -215,6 +230,9 @@ export function newGame(attract: boolean, seed = (Math.random() * 2 ** 32) >>> 0
       flash: 0,
       smashed: new Set<number>(),
       arrows: new Map<number, 'caught' | 'fumbled' | 'passed'>(),
+      upAt: -Infinity,
+      downAt: -Infinity,
+      halfJump: null,
       incoming: [],
       particles: [],
       labels: [],
@@ -322,8 +340,10 @@ function generate(game: Game): void {
     if (d >= game.nextArrowAt) {
       const { cx, hw } = canyonAt(game, d);
       const x = cx + (game.rand() * 2 - 1) * (hw - 60);
-      game.powerups.push({ id: game.nextId++, d, x, arrow: game.rand() < 0.5 ? 'up' : 'down' });
-      game.nextArrowAt = d + lerp(1300, 2300, diff) * (0.8 + 0.4 * game.rand());
+      const kind = game.rand();
+      const arrow: Arrow = kind < 0.2 ? 'both' : kind < 0.6 ? 'up' : 'down';
+      game.powerups.push({ id: game.nextId++, d, x, arrow });
+      game.nextArrowAt = d + lerp(650, 1150, diff) * (0.8 + 0.4 * game.rand());
     } else {
       addRockRow(game, d, diff);
     }
@@ -358,7 +378,14 @@ function makeRock(game: Game, d: number, x: number, r: number): Rock {
     d,
     x,
     r,
-    hue: 6 + rand() * 46,
+    hue: ROCK_HUE - 5 + rand() * 10,
+    ...rockLook(rand),
+  };
+}
+
+/** A lumpy outline and a slow tumble: every rock looks like this, whoever it's from. */
+function rockLook(rand: () => number): Pick<Rock, 'angle' | 'spin' | 'shape'> {
+  return {
     angle: rand() * Math.PI * 2,
     spin: (rand() - 0.5) * 1.6,
     shape: Array.from({ length: 7 + Math.floor(rand() * 4) }, () => 0.74 + rand() * 0.32),
@@ -419,8 +446,11 @@ function updateShip(game: Game, ship: Ship, dt: number, input: Input): void {
     }
     if (racing) {
       if (ship.invuln <= 0) hitRocks(game, ship);
+      if (input.up) ship.upAt = game.clock;
+      if (input.down) ship.downAt = game.clock;
       if (input.up) tryCatch(game, ship, 'up');
       if (input.down) tryCatch(game, ship, 'down');
+      expireHalfJump(game, ship);
       letArrowsPass(game, ship);
       if (ship.y >= DEATH_Y - 2) explode(ship);
     }
@@ -467,7 +497,7 @@ function explode(ship: Ship): void {
 
 // ---- Arrows and attacks ----
 
-function tryCatch(game: Game, ship: Ship, arrow: Arrow): void {
+function tryCatch(game: Game, ship: Ship, step: 'up' | 'down'): void {
   // The nearest arrow in line with the ship that's about to arrive or has only just arrived.
   let best: Powerup | undefined;
   let bestT = 0;
@@ -482,19 +512,40 @@ function tryCatch(game: Game, ship: Ship, arrow: Arrow): void {
   }
   if (!best) return;
 
-  const y = screenY(game, best.d);
-  const hue = ARROW_HUES[best.arrow];
-  if (best.arrow !== arrow || bestT > GOOD_WINDOW) {
-    ship.arrows.set(best.id, 'fumbled');
-    shatter(ship, best.x, y, arrowPoints(best.arrow, 1.25), hue, 120, game.speed);
-    addLabel(ship, best.arrow !== arrow ? 'WRONG ARROW' : 'TOO EARLY', best.x, y - 40, 0, 24);
+  if (best.arrow === 'both') {
+    const otherAt = step === 'up' ? ship.downAt : ship.upAt;
+    if (game.clock - otherAt > JUMP_WINDOW) {
+      // Only one foot down so far: give the other a moment to land.
+      if (!ship.halfJump) ship.halfJump = { id: best.id, at: game.clock };
+      return;
+    }
+    ship.halfJump = null;
+  } else if (best.arrow !== step) {
+    fumble(game, ship, best, 'WRONG ARROW');
+    return;
+  }
+  if (bestT > GOOD_WINDOW) {
+    fumble(game, ship, best, 'TOO EARLY');
     return;
   }
 
   ship.arrows.set(best.id, 'caught');
   ship.caught++;
+  const y = screenY(game, best.d);
+  const hue = ARROW_HUES[best.arrow];
   const perfect = Math.abs(bestT) <= PERFECT_WINDOW;
-  addLabel(ship, perfect ? 'PERFECT!' : 'GOOD!', ship.x, ship.y - 52, hue, perfect ? 36 : 28);
+  let labelY = Math.min(ship.y, ship.targetY) - 52;
+  if (best.arrow === 'both') {
+    // A jump also lifts you back up as far as a rock knocks you down, but never above the start line.
+    const lift = Math.min(ROCK_KNOCKBACK, ship.targetY - SHIP_START_Y);
+    if (lift > 0) {
+      ship.targetY -= lift;
+      labelY = Math.min(ship.y, ship.targetY) - 52;
+      addLabel(ship, 'BOOST!', ship.x, labelY - 34, hue, 26);
+      sparks(ship, ship.x, ship.y + 20, 40, 24, 260, game.speed * 0.5); // a burst of exhaust
+    }
+  }
+  addLabel(ship, perfect ? 'PERFECT!' : 'GOOD!', ship.x, labelY, hue, perfect ? 36 : 28);
   sparks(ship, best.x, y, hue, perfect ? 30 : 18, 280);
   ring(ship, best.x, y, hue, 260);
   const rival = game.ships[1 - ship.index];
@@ -504,6 +555,22 @@ function tryCatch(game: Game, ship: Ship, arrow: Arrow): void {
     const tx = canyonAt(game, game.scroll + FIELD_H).cx;
     game.missiles.push({ from: ship.index, to: rival.index, count, t: 0, x: ship.x, y: ship.y, tx });
   }
+}
+
+/** A jump arrow with only one foot on it once the other's had its chance is a fumble. */
+function expireHalfJump(game: Game, ship: Ship): void {
+  const half = ship.halfJump;
+  if (!half || game.clock - half.at <= JUMP_WINDOW) return;
+  ship.halfJump = null;
+  const p = game.powerups.find((p) => p.id === half.id);
+  if (p && !ship.arrows.has(p.id)) fumble(game, ship, p, 'BOTH FEET!');
+}
+
+function fumble(game: Game, ship: Ship, p: Powerup, text: string): void {
+  const y = screenY(game, p.d);
+  ship.arrows.set(p.id, 'fumbled');
+  shatter(ship, p.x, y, arrowPoints(p.arrow, 1.25), ARROW_HUES[p.arrow], 120, game.speed);
+  addLabel(ship, text, p.x, y - 40, 0, 24);
 }
 
 function letArrowsPass(game: Game, ship: Ship): void {
@@ -537,17 +604,7 @@ function dropRocks(game: Game, ship: Ship, count: number, from: number): void {
         (rock) => Math.abs(rock.d - d) > rock.r + r + 30 || Math.abs(rock.x - x) > rock.r + r + 2 * SHIP_HALF_W + 24,
       ) && game.powerups.every((p) => Math.abs(p.d - d) > r + 70 || Math.abs(p.x - x) > r + 60);
     if (fits) {
-      const rock: Rock = {
-        id: game.nextId++,
-        d,
-        x,
-        r,
-        hue: PLAYER_HUES[from],
-        angle: Math.random() * Math.PI,
-        spin: (Math.random() < 0.5 ? -1 : 1) * 2.2,
-        shape: Array.from({ length: 12 }, (_, i) => (i % 2 ? 0.5 : 1)),
-        from,
-      };
+      const rock: Rock = { id: game.nextId++, d, x, r, hue: SENT_ROCK_HUE, ...rockLook(Math.random), from };
       ship.incoming.push(rock);
       blockers.push(rock);
       placed++;
