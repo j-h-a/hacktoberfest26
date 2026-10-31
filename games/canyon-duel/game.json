@@ -1,0 +1,6 @@
+{
+  "title": "Canyon Duel",
+  "description": "Race side by side up a glowing vector canyon. Dodge the rocks, and catch ↑ ↓ arrows as they reach you to fire rocks at your rival.",
+  "players": "2",
+  "tech": "Canvas 2D"
+}
