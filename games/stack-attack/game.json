@@ -1,0 +1,6 @@
+{
+  "title": "Stack Attack",
+  "description": "Head-to-head falling blocks. Every row you clear drops an extra piece on your rival, so keep clearing and juggle the ones they send back.",
+  "players": "2",
+  "tech": "Canvas 2D"
+}
